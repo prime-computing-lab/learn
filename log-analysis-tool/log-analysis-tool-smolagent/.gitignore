@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env
+
+# Logs
+*.log
+log_analysis_system/data/raw_logs/*
+log_analysis_system/data/processed_logs/*
+log_analysis_system/output/*
+analysis_results_*.txt
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Keep data directories with .gitkeep
+!log_analysis_system/data/raw_logs/.gitkeep
+!log_analysis_system/data/processed_logs/.gitkeep
+!log_analysis_system/output/.gitkeep 
+
+.ignore/

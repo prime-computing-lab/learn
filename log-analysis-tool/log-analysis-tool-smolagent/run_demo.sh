@@ -2,28 +2,6 @@
 
 # Run Log Analysis System in Demo Mode
 
-# Default Ollama model
-OLLAMA_MODEL=${OLLAMA_MODEL:-"llama3.2"}
-DISABLE_AI=""
-
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --model)
-            OLLAMA_MODEL="$2"
-            shift; shift
-            ;;
-        --disable-ai)
-            DISABLE_AI="--disable-ai"
-            shift
-            ;;
-        *)
-            echo "Unknown option: $1"
-            exit 1
-            ;;
-    esac
-done
-
 # Check if virtual environment exists
 if [ ! -d "venv" ]; then
     echo "Creating virtual environment..."
@@ -33,21 +11,6 @@ if [ ! -d "venv" ]; then
     pip install -r requirements.txt
 else
     source venv/bin/activate
-fi
-
-# Check if Ollama AI is being used
-if [ -z "$DISABLE_AI" ]; then
-    echo "Using Ollama model: $OLLAMA_MODEL"
-    export OLLAMA_MODEL="$OLLAMA_MODEL"
-    
-    # Check if Ollama is running
-    if ! curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
-        echo "⚠️ Warning: Ollama server is not running. Start it with 'ollama serve'"
-        echo "Continuing with AI enhancement disabled"
-        DISABLE_AI="--disable-ai"
-    fi
-else
-    echo "AI enhancement is disabled"
 fi
 
 # Generate fresh demo logs
@@ -99,12 +62,6 @@ print(f'Generated log file: data/logs/connection_issue_demo_{timestamp}.log')
 
 # Run analysis
 echo "Running analysis on generated logs..."
-./analyze_logs.py --logs ./data/logs --term error --verbose $DISABLE_AI
+./analyze_logs.py --logs ./data/logs --term error --verbose
 
-echo "Demo complete."
-echo
-if [ -z "$DISABLE_AI" ]; then
-    echo "✅ Analysis completed with Ollama model: $OLLAMA_MODEL"
-else 
-    echo "⚠️ Analysis completed with AI enhancement disabled"
-fi 
+echo "Demo complete." 

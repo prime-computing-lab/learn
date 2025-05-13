@@ -11,43 +11,6 @@ if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1
     exit 1
 fi
 
-# Check if Ollama is installed
-echo "Checking for Ollama..."
-if command -v ollama >/dev/null 2>&1; then
-    echo "✅ Ollama is installed!"
-    # Check if Ollama is running
-    if curl -s http://localhost:11434/api/version >/dev/null 2>&1; then
-        echo "✅ Ollama server is running"
-        
-        # Check for required models
-        echo "Checking for required models..."
-        MODELS=("llama3.2" "llama3.1" "deepseek-r1")
-        MISSING_MODELS=()
-        
-        for MODEL in "${MODELS[@]}"; do
-            if ! curl -s "http://localhost:11434/api/tags" | grep -q "\"name\":\"$MODEL\""; then
-                MISSING_MODELS+=("$MODEL")
-            fi
-        done
-        
-        if [ ${#MISSING_MODELS[@]} -eq 0 ]; then
-            echo "✅ All required models are available"
-        else
-            echo "⚠️ Some required models are missing:"
-            for MODEL in "${MISSING_MODELS[@]}"; do
-                echo "   - $MODEL"
-            done
-            echo "You can pull them with: ollama pull MODEL_NAME"
-        fi
-    else
-        echo "⚠️ Ollama is installed but not running"
-        echo "Start it with: ollama serve"
-    fi
-else
-    echo "⚠️ Ollama is not installed"
-    echo "You can install it from: https://ollama.com"
-    echo "The tool will fall back to basic analysis without AI enhancement"
-fi
 
 # Create virtual environment if it doesn't exist
 if [ ! -d "venv" ]; then
@@ -138,10 +101,4 @@ for log_type in ['connection', 'permission']:
 
 echo "Setup complete!"
 echo "To analyze logs, run: ./run_analysis.sh"
-echo "To launch the web UI, run: ./run_ui.sh"
-echo
-if command -v ollama >/dev/null 2>&1; then
-    echo "With Ollama integration! Your AI-enhanced analysis is ready to use."
-else
-    echo "⚠️ For AI-enhanced analysis, install Ollama from https://ollama.com"
-fi 
+echo "To launch the web UI, run: ./run_ui.sh" 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple log analysis script that uses GenAI to enhance the analysis.
+Simple log analysis script that doesn't rely on CrewAI.
 This will search log files for specific terms and analyze the results.
 """
 
@@ -117,7 +117,7 @@ def analyze_log_entries(entries):
             time_pattern = {
                 'first_occurrence': timestamps[0],
                 'last_occurrence': timestamps[-1],
-                'total_occurrences': len(timestamps)
+                '  ': len(timestamps)
             }
         except Exception as e:
             print(f"Error analyzing timestamps: {e}")
@@ -215,7 +215,6 @@ def main():
     parser.add_argument("--output", type=str, help="Output file for results (JSON)")
     parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
     parser.add_argument("--disable-ai", action="store_true", help="Disable AI enhancement")
-    parser.add_argument("--debug", action="store_true", help="Enable debug output")
     args = parser.parse_args()
     
     # Set environment variable to control AI usage
@@ -224,11 +223,6 @@ def main():
         print("\n⚠️  AI Enhancement has been DISABLED via command-line flag\n")
     else:
         print("\n🔍 AI Enhancement status will be determined by API key availability\n")
-    
-    # Set debug mode
-    if args.debug:
-        os.environ["DEBUG"] = "1"
-        print("\n🐞 Debug mode is ENABLED\n")
     
     # Verify log directory exists
     if not os.path.exists(args.logs):
@@ -257,111 +251,80 @@ def main():
         for match in matches[:5]:  # Show max 5 matches
             print(f"  - {match['file']}:{match['line_number']}: {match['content'][:100]}...")
     
-    # Analyze log entries
-    print("Analyzing log entries...")
+    # Analyze results
     analysis = analyze_log_entries(matches)
+    print("\n===== Analysis Results =====")
+    print(f"Total Entries: {analysis['total_entries']}")
+    print("Severity Distribution:")
+    for severity, count in analysis['severity_distribution'].items():
+        print(f"  - {severity}: {count}")
     
-    # Generate solution suggestions
-    print("Generating solutions...")
-    solutions = suggest_solutions(analysis)
+    print("\nAffected Components:")
+    for component, count in sorted(analysis['components'].items(), key=lambda x: x[1], reverse=True)[:5]:
+        print(f"  - {component}: {count}")
     
-    # Prepare the results
-    results = {
-        'metadata': {
-            'timestamp': datetime.now().isoformat(),
-            'search_term': args.term,
-            'log_directory': args.logs,
-            'total_files_searched': len(log_files),
-            'total_matches': len(matches)
-        },
-        'matches': matches,
-        'analysis': analysis,
-        'solutions': solutions
-    }
+    print("\nMost Common Error Patterns:")
+    for i, pattern in enumerate(analysis['error_patterns'][:3], 1):
+        print(f"  {i}. Component: {pattern['component']}")
+        print(f"     Pattern: {pattern['pattern'][:100]}...")
+        print(f"     Count: {pattern['count']}")
     
-    # Use AI to enhance the solutions if possible
-    ai_status = is_ai_enhancement_enabled()
-    if ai_status:
-        try:
-            print("Enhancing solutions with AI...")
-            results = enhance_solutions(results)
-        except Exception as e:
-            print(f"Error enhancing solutions: {e}")
-            results["ai_enhancement_used"] = False
-            results["ai_error"] = str(e)
+    # Check AI enhancement status before suggesting solutions
+    ai_enabled = is_ai_enhancement_enabled()
+    if ai_enabled:
+        print("\n✨ AI ENHANCEMENT IS ENABLED - Solutions will be enhanced with SmoLAgent")
     else:
-        results["ai_enhancement_used"] = False
+        print("\n⚠️ AI ENHANCEMENT IS DISABLED - Using basic solutions only")
+        
+    # Suggest solutions
+    print("\n===== Generating Solutions =====")
+    result = {"analysis": analysis, "solutions": []}
     
-    # Output the results
+    # First generate basic solutions
+    basic_solutions = suggest_solutions(analysis)
+    result["solutions"] = basic_solutions
+    
+    # Then enhance with AI if possible
+    try:
+        result = enhance_solutions(result)
+    except Exception as e:
+        print(f"Error using AI enhancement: {e}")
+    
+    # Get the final solutions
+    solutions = result["solutions"]
+    ai_used = result.get("ai_enhancement_used", False)
+    
+    print("\n===== Suggested Solutions =====")
+    print(f"Status: {'✨ AI ENHANCED' if ai_used else '⚠️ BASIC SOLUTIONS ONLY'}")
+    print("----------------------------")
+    for i, solution in enumerate(solutions, 1):
+        print(f"{i}. Problem: {solution['problem']}")
+        print(f"   Solution: {solution['solution']}")
+        if solution.get("ai_enhanced", False):
+            print("   ✨ AI Enhanced")
+        print()
+    
+    # Save results to file if requested
     if args.output:
-        with open(args.output, 'w') as f:
-            json.dump(results, f, indent=2)
-        print(f"Results written to {args.output}")
-    else:
-        # Print summary to console
-        print("\n--- Analysis Summary ---")
-        print(f"Total entries: {analysis['total_entries']}")
+        results = {
+            'analysis': analysis,
+            'solutions': solutions,
+            'ai_enhancement_used': ai_used,
+            'metadata': {
+                'logs_directory': args.logs,
+                'search_term': args.term,
+                'timestamp': datetime.now().isoformat(),
+                'total_files_searched': len(log_files),
+                'total_matches': len(matches)
+            }
+        }
         
-        if 'severity_distribution' in analysis:
-            print("\nSeverity distribution:")
-            for severity, count in analysis['severity_distribution'].items():
-                print(f"  - {severity}: {count}")
-        
-        # Get the solutions from the results dictionary AFTER AI enhancement
-        ai_enhanced_solutions = results.get('solutions', [])
-        
-        if ai_enhanced_solutions:
-            print("\nSuggested solutions:")
-            
-            # Debug output for solutions
-            if os.getenv("DEBUG") == "1":
-                print(f"\nDEBUG: Total solutions: {len(ai_enhanced_solutions)}")
-                for i, solution in enumerate(ai_enhanced_solutions):
-                    print(f"DEBUG: Solution {i+1} keys: {list(solution.keys())}")
-                    print(f"DEBUG: Is AI enhanced? {solution.get('ai_enhanced', False)}")
-            
-            for i, solution in enumerate(ai_enhanced_solutions, 1):
-                problem = solution.get('problem', 'Unknown issue')
-                
-                # Determine which solution text to display - prefer AI enhanced if available
-                if solution.get('ai_enhanced', False):
-                    solution_text = solution.get('solution', '')
-                else:
-                    solution_text = solution.get('solution', '')
-                    if os.getenv("DEBUG") == "1":
-                        print(f"DEBUG: Using original solution for {problem} - AI enhancement not available")
-                
-                print(f"  {i}. {problem}")
-                
-                # Debug the content of the solution
-                if os.getenv("DEBUG") == "1":
-                    print(f"DEBUG: Solution {i} content length: {len(solution_text)}")
-                    print(f"DEBUG: Solution {i} first 50 chars: {solution_text[:50]}...")
-                
-                # Only display the first 3-4 lines of the enhanced solution to keep it concise
-                # Split by newlines and filter out empty lines
-                solution_lines = [line for line in solution_text.split('\n') if line.strip()]
-                if len(solution_lines) > 4:
-                    # Display first 3 lines if the solution is very long
-                    display_solution = '\n     '.join(solution_lines[:3]) + '\n     ...'
-                else:
-                    display_solution = '\n     '.join(solution_lines)
-                
-                print(f"     {display_solution}")
-                
-                # Add a line break for readability
-                if i < len(ai_enhanced_solutions):
-                    print("")
-        
-        if results.get("ai_enhancement_used", False):
-            model_name = results.get("ollama_model_used", os.getenv("OLLAMA_MODEL", "default"))
-            print(f"\n✨ Solutions were enhanced using Ollama model: {model_name}")
-        elif results.get("ai_error"):
-            print(f"\n⚠️ AI enhancement failed: {results.get('ai_error')}")
-            if os.getenv("DEBUG") == "1":
-                print(f"Detailed error: {results.get('ai_error')}")
-        else:
-            print("\n⚠️ AI enhancement was not used")
+        try:
+            with open(args.output, 'w') as f:
+                json.dump(results, f, indent=2)
+            print(f"\nResults saved to {args.output}")
+        except Exception as e:
+            print(f"Error saving results: {e}")
 
 if __name__ == "__main__":
     main() 
